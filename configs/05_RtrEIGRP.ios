@@ -1,0 +1,60 @@
+! ==============================================================================
+! Cisco IOS Configuration: 05_RtrEIGRP.ios
+! Device: RtrEIGRP (Autonomous System 111 Branch Router)
+! Author: Egor Zvyagin | Melbourne, VIC
+! Architecture: EIGRP AS 111 Interior Routing, WAN Serial Link, Branch LAN Support
+! ==============================================================================
+!
+version 15.4
+service timestamps debug datetime msec
+service timestamps log datetime msec
+no service password-encryption
+!
+hostname RtrEIGRP
+!
+boot-start-marker
+boot-end-marker
+!
+no aaa new-model
+clock timezone AEST 10 0
+!
+! --- Interface Configurations ---
+!
+! WAN Link to Core Gateway Router (Serial 0/1/1)
+interface Serial0/1/1
+ description WAN-LINK-TO-HEADQUARTERS-GATEWAY
+ ip address 10.10.1.2 255.255.255.252
+ no shutdown
+!
+! Branch LAN Subnet (GigabitEthernet 0/0)
+interface GigabitEthernet0/0
+ description REGIONAL-BRANCH-LAN-GATEWAY
+ ip address 10.20.1.1 255.255.255.0
+ duplex auto
+ speed auto
+ no shutdown
+!
+! Loopback Management Interface
+interface Loopback0
+ description BRANCH-OPERATIONS-LOOPBACK
+ ip address 10.254.1.1 255.255.255.255
+ no shutdown
+!
+! --- EIGRP AS 111 Dynamic Routing ---
+router eigrp 111
+ eigrp router-id 9.9.9.9
+ network 10.10.1.0 0.0.0.3
+ network 10.20.1.0 0.0.0.255
+ network 10.254.1.1 0.0.0.0
+ passive-interface GigabitEthernet0/0
+ no auto-summary
+!
+! --- Management & Line Configuration ---
+line con 0
+ logging synchronous
+ exec-timeout 15 0
+line vty 0 4
+ login local
+ transport input ssh
+!
+end

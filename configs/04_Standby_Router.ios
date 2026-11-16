@@ -1,0 +1,61 @@
+! ==============================================================================
+! Cisco IOS Configuration: 04_Standby_Router.ios
+! Device: Standby_Rtr (Redundant Standby Gateway Router)
+! Author: Egor Zvyagin | Melbourne, VIC
+! Architecture: HSRPv2 Standby Partner, OSPFv2 Area 0, High Availability Routing
+! ==============================================================================
+!
+version 15.4
+service timestamps debug datetime msec
+service timestamps log datetime msec
+no service password-encryption
+!
+hostname Standby_Rtr
+!
+boot-start-marker
+boot-end-marker
+!
+no aaa new-model
+clock timezone AEST 10 0
+!
+! --- Interface Configurations & HSRPv2 Standby Configuration ---
+!
+! Downlink to Server Farm / FTP Segment (GigabitEthernet 0/0)
+interface GigabitEthernet0/0
+ description SERVER-FARM-VLAN-HSRP-STANDBY-GATEWAY
+ ip address 4.4.4.3 255.255.255.0
+ ip ospf 22 area 0
+ ! HSRP Version 2 Configuration - Default Priority (100)
+ standby version 2
+ standby 22 ip 4.4.4.254
+ ! In the event of MLS failure, Standby_Rtr transitions from Standby to Active state seamlessly
+ duplex auto
+ speed auto
+ no shutdown
+!
+! Core Uplink to Gateway Router (GigabitEthernet 0/1)
+interface GigabitEthernet0/1
+ description CORE-TRANSIT-UPLINK-TO-GATEWAY-ROUTER
+ ip address 172.16.2.2 255.255.255.0
+ ip ospf 22 area 0
+ duplex auto
+ speed auto
+ no shutdown
+!
+! --- OSPFv2 Dynamic Routing ---
+router ospf 22
+ router-id 4.4.4.3
+ log-adjacency-changes
+ auto-cost reference-bandwidth 1000
+ network 4.4.4.0 0.0.0.255 area 0
+ network 172.16.2.0 0.0.0.255 area 0
+!
+! --- Management & Line Configuration ---
+line con 0
+ logging synchronous
+ exec-timeout 15 0
+line vty 0 4
+ login local
+ transport input ssh
+!
+end

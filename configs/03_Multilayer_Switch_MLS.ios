@@ -1,0 +1,78 @@
+! ==============================================================================
+! Cisco IOS Configuration: 03_Multilayer_Switch_MLS.ios
+! Device: MLS (Multilayer Switch - Distribution & Core Routing Layer)
+! Author: Egor Zvyagin | Melbourne, VIC
+! Architecture: Layer 3 Switching, HSRPv2 Gateway Redundancy, OSPFv2 Area 0, Interface Tracking
+! ==============================================================================
+!
+version 15.2
+service timestamps debug datetime msec
+service timestamps log datetime msec
+no service password-encryption
+!
+hostname MLS
+!
+boot-start-marker
+boot-end-marker
+!
+! --- Enable Layer 3 Routing Engine ---
+ip routing
+!
+no aaa new-model
+clock timezone AEST 10 0
+!
+! --- Interface Configurations & HSRPv2 First Hop Redundancy ---
+!
+! Downlink to Server Farm / FTP Segment (GigabitEthernet 0/1)
+interface GigabitEthernet0/1
+ description SERVER-FARM-VLAN-HSRP-PRIMARY-GATEWAY
+ no switchport
+ ip address 4.4.4.2 255.255.255.0
+ ! Enable OSPF process 22 directly on the interface
+ ip ospf 22 area 0
+ ! HSRP Version 2 Configuration
+ standby version 2
+ standby 22 ip 4.4.4.254
+ standby 22 priority 110
+ standby 22 preempt
+ ! Track core uplink G0/2; decrement priority by 20 upon uplink failure to trigger failover
+ standby 22 track GigabitEthernet0/2 20
+ duplex auto
+ speed auto
+ no shutdown
+!
+! Core Uplink to Gateway Router (GigabitEthernet 0/2)
+interface GigabitEthernet0/2
+ description CORE-TRANSIT-UPLINK-TO-GATEWAY-ROUTER
+ no switchport
+ ip address 172.16.1.2 255.255.255.0
+ ip ospf 22 area 0
+ duplex auto
+ speed auto
+ no shutdown
+!
+! Layer 2 Campus Access Trunks (Inter-Switch Links)
+interface range GigabitEthernet0/3 - 4
+ description ACCESS-LAYER-DISTRIBUTION-TRUNKS
+ switchport mode trunk
+ switchport trunk native vlan 99
+ switchport trunk allowed vlan 10,20,30,99
+ no shutdown
+!
+! --- OSPFv2 Dynamic Routing ---
+router ospf 22
+ router-id 4.4.4.2
+ log-adjacency-changes
+ auto-cost reference-bandwidth 1000
+ network 4.4.4.0 0.0.0.255 area 0
+ network 172.16.1.0 0.0.0.255 area 0
+!
+! --- Management & Line Configuration ---
+line con 0
+ logging synchronous
+ exec-timeout 15 0
+line vty 0 4
+ login local
+ transport input ssh
+!
+end

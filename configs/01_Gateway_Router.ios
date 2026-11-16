@@ -1,0 +1,101 @@
+! ==============================================================================
+! Cisco IOS Configuration: 01_Gateway_Router.ios
+! Device: Gateway (Core Border Gateway Router)
+! Author: Egor Zvyagin | Melbourne, VIC
+! Architecture: OSPFv2 Area 0, EIGRP AS 111 Redistribution, PPP CHAP WAN, Default Route
+! ==============================================================================
+!
+version 15.4
+service timestamps debug datetime msec
+service timestamps log datetime msec
+no service password-encryption
+!
+hostname Gateway
+!
+boot-start-marker
+boot-end-marker
+!
+! --- Security & User Authentication ---
+! Username authentication for PPP CHAP connection with ISP
+username ISP password WIN
+!
+no aaa new-model
+clock timezone AEST 10 0
+!
+! --- Interface Configurations ---
+!
+! WAN Link to ISP Router (Serial 0/0/0)
+interface Serial0/0/0
+ description WAN-UPLINK-TO-ISP-PRIMARY
+ ip address 209.165.200.225 255.255.255.252
+ encapsulation ppp
+ ppp authentication chap
+ clock rate 64000
+ no shutdown
+!
+! WAN / Branch Link to EIGRP Domain (Serial 0/0/1)
+interface Serial0/0/1
+ description WAN-LINK-TO-RtrEIGRP-BRANCH
+ ip address 10.10.1.1 255.255.255.252
+ clock rate 64000
+ no shutdown
+!
+! Core Transit Link to Multilayer Switch (GigabitEthernet 0/1)
+interface GigabitEthernet0/1
+ description TRANSIT-LINK-TO-MLS-CORE
+ ip address 172.16.1.1 255.255.255.0
+ ip ospf 22 area 0
+ duplex auto
+ speed auto
+ no shutdown
+!
+! Redundant Transit Link to Standby Router (GigabitEthernet 0/2)
+interface GigabitEthernet0/2
+ description TRANSIT-LINK-TO-STANDBY-RTR
+ ip address 172.16.2.1 255.255.255.0
+ ip ospf 22 area 0
+ duplex auto
+ speed auto
+ no shutdown
+!
+! --- Routing Configurations ---
+!
+! Static Default Route towards ISP Gateway
+ip route 0.0.0.0 0.0.0.0 Serial0/0/0
+!
+! OSPFv2 Process 22 - Enterprise Core & Distribution Area 0
+router ospf 22
+ router-id 11.1.1.1
+ log-adjacency-changes
+ auto-cost reference-bandwidth 1000
+ ! Propagate default quad-zero route to internal OSPF neighbours
+ default-information originate
+ ! Mutual Route Redistribution: Inject EIGRP AS 111 subnets into OSPF with metric 1
+ redistribute eigrp 111 metric 1 subnets
+ ! Passive interfaces for stub security
+ passive-interface default
+ no passive-interface GigabitEthernet0/1
+ no passive-interface GigabitEthernet0/2
+ network 172.16.1.0 0.0.0.255 area 0
+ network 172.16.2.0 0.0.0.255 area 0
+!
+! EIGRP Process 111 - Branch Office Routing Domain
+router eigrp 111
+ eigrp router-id 10.10.10.10
+ network 10.10.1.0 0.0.0.3
+ ! Redistribute default static route into EIGRP neighbours
+ redistribute static
+ ! Mutual Route Redistribution: Inject OSPF Process 22 into EIGRP with composite metric (BW, Delay, Reliability, Load, MTU)
+ redistribute ospf 22 metric 1 1 1 1 1
+ no auto-summary
+!
+! --- Line & Access Control ---
+line con 0
+ logging synchronous
+ exec-timeout 15 0
+line aux 0
+line vty 0 4
+ login local
+ transport input ssh
+!
+end

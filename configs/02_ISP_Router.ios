@@ -1,0 +1,61 @@
+! ==============================================================================
+! Cisco IOS Configuration: 02_ISP_Router.ios
+! Device: ISP (Service Provider Border Router)
+! Author: Egor Zvyagin | Melbourne, VIC
+! Architecture: PPP CHAP WAN Authentication, Simulated Internet Loopback, Route Return
+! ==============================================================================
+!
+version 15.4
+service timestamps debug datetime msec
+service timestamps log datetime msec
+no service password-encryption
+!
+hostname ISP
+!
+boot-start-marker
+boot-end-marker
+!
+! --- Security & User Authentication ---
+! Username authentication matching incoming Gateway PPP CHAP identifier
+username Gateway password WIN
+!
+no aaa new-model
+clock timezone AEST 10 0
+!
+! --- Interface Configurations ---
+!
+! WAN Link to Customer Gateway Router (Serial 0/0/1)
+interface Serial0/0/1
+ description WAN-CUSTOMER-FACING-LINK-GATEWAY
+ ip address 209.165.200.226 255.255.255.252
+ encapsulation ppp
+ ppp authentication chap
+ no shutdown
+!
+! Simulated Internet Backbone / Public DNS Service
+interface Loopback0
+ description SIMULATED-INTERNET-PUBLIC-DNS-SERVICES
+ ip address 8.8.8.8 255.255.255.255
+ no shutdown
+!
+interface Loopback1
+ description SIMULATED-GLOBAL-CLOUD-SERVICES
+ ip address 198.51.100.1 255.255.255.0
+ no shutdown
+!
+! --- Static Routing ---
+! Return route for enterprise aggregate prefix over PPP link
+ip route 172.16.0.0 255.255.0.0 Serial0/0/1
+ip route 10.0.0.0 255.0.0.0 Serial0/0/1
+ip route 4.4.4.0 255.255.255.0 Serial0/0/1
+!
+! --- Line & Access Control ---
+line con 0
+ logging synchronous
+ exec-timeout 15 0
+line aux 0
+line vty 0 4
+ login local
+ transport input ssh
+!
+end
