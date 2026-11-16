@@ -58,4 +58,9 @@ line vty 0 4
  login local
  transport input ssh
 !
+! --- Verification Commands ---
+! show interfaces Serial0/0/1
+! show ip route
+! ping 209.165.200.225
+!
 end
